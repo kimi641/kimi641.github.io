@@ -1,6 +1,6 @@
 # Site settings
 title: Kimi641 Blog
-SEOTitle: 你的博客 | Your Blog
+SEOTitle: Kimi641的博客 | Kimi641 Blog
 header-img: img/home-bg.jpg
 email: liushiyi1991@gmail.com
 description: A new Blog site
@@ -12,11 +12,11 @@ baseurl: ""         # for example, '/blog' if your blog hosted on 'host/blog'
 
 # SNS settings
 RSS: false
-weibo_username:     huxpro
-zhihu_username:     huxpro
+weibo_username:     莲子梅丽
+zhihu_username:     dixieland
 github_username:    kimi641
 #twitter_username:  huxpro
-facebook_username:  huxpro
+facebook_username:  shiyi.liu.56
 
 
 
@@ -68,8 +68,8 @@ kramdown:
 
 # Sidebar settings
 sidebar: true                           # whether or not using Sidebar.
-sidebar-about-description: "写写代码，做做设计，看看产品。世界那么大，多玩玩看看。"
-sidebar-avatar: /img/avatar-hux.jpg      # use absolute URL, seeing it's used in both `/` and `/about/`
+sidebar-about-description: "生物，读书，摄影以及一些杂七杂八的话题"
+sidebar-avatar: /img/icon.jpg      # use absolute URL, seeing it's used in both `/` and `/about/`
 
 
 
