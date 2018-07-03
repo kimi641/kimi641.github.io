@@ -1,0 +1,24 @@
+---
+layout:     post
+title:      "本子自动翻译和修图"
+subtitle:   "大概能做吧"
+date:       2018-07-03 12:00:00
+author:     "Kimi641"
+header-img: "img/post-bg-2015.jpg"
+tags:
+    - 深度学习
+---
+## 前言
+前阵子在泥潭看到一个帖子说能不能做一个自动翻译和修图的软件或者脚本来使翻译本子更效率，我想了想，感觉这个可以有。
+ORC的算法在百度云就有提供，翻译软件估计也有吧，但是基于百度云做的话不知道会不会被封了，毕竟这都是本子。这个应该比较容易一点吧，毕竟都是商业提供的软件，不知道会不会有人去尝试。
+下面我设想了一种基于深度学习的开源算法的方式来解决这个问题，如果有人有想法的话或许可以一起讨论一下。
+
+## 正文
+于是稍微查了一下，发现文字识别在2017CVPR上有[EAST](https://arxiv.org/pdf/1704.03155.pdf) 2018CVPR上有[Multi-Oriented Scene Text Detection via Corner Localization and Region Segmentation](https://arxiv.org/pdf/1802.08948.pdf)可以完成文字的识别。
+
+而对于文字的识别可以用单个文字的检测算法[Multi-digit Number](https://arxiv.org/pdf/1312.6082.pdf),先识别出单个的文字再用seq2seq进行翻译的训练。或者可以尝试一下[CRNN](https://arxiv.org/pdf/1706.01069.pdf)来进行文字的识别？
+
+训练集的话就用e站和n站的本子就行了，图片大概有上万张吧。但是不知道批量下载会不会被封，整体下完之后再进行10-fold的交叉验证。看看这个系统的到底能不能work，如果能用的话再好不过，不能用的话再说吧。（笑）
+
+—— Kimi641 于 2018.07.03
+
