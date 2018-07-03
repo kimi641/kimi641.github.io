@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      "通往奴役之路（一）"
+title:      "通往奴役之路(一)"
 subtitle:   "自由还是计划"
 date:       2018-07-02 12:00:00
 author:     "Kimi641"
