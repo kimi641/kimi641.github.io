@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GLM-5.2 架构解析</title>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --bg-soft: #121829;
+    --card: #1a2238;
+    --border: #2a3450;
+    --text: #e8ecf4;
+    --muted: #8a93a8;
+    --accent: #4f9eff;
+    --accent-2: #7c5cff;
+    --accent-3: #00d4aa;
+    --warn: #ffb454;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  /* 背景动效 */
+  .bg-grid {
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(79, 158, 255, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(79, 158, 255, 0.04) 1px, transparent 1px);
+    background-size: 50px 50px;
+    z-index: 0;
+    pointer-events: none;
+    mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+  }
+
+  .bg-blob {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.25;
+    z-index: 0;
+    pointer-events: none;
+    animation: float 20s ease-in-out infinite;
+  }
+  .blob-1 { width: 500px; height: 500px; background: var(--accent); top: -100px; left: -100px; }
+  .blob-2 { width: 600px; height: 600px; background: var(--accent-2); bottom: -200px; right: -150px; animation-delay: -7s; }
+  .blob-3 { width: 400px; height: 400px; background: var(--accent-3); top: 40%; left: 50%; animation-delay: -14s; opacity: 0.15; }
+
+  @keyframes float {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(60px, -40px) scale(1.1); }
+    66% { transform: translate(-40px, 50px) scale(0.95); }
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* 导航 */
+  nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(20px);
+    background: rgba(10, 14, 26, 0.7);
+    border-bottom: 1px solid var(--border);
+  }
+  nav .container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+  }
+  .logo {
+    font-weight: 700;
+    font-size: 18px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 0.5px;
+  }
+  .nav-links { display: flex; gap: 28px; }
+  .nav-links a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 14px;
+    transition: color 0.2s;
+  }
+  .nav-links a:hover { color: var(--text); }
+
+  /* Hero */
+  .hero {
+    padding: 120px 0 80px;
+    text-align: center;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    background: var(--card);
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 28px;
+  }
+  .badge .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent-3);
+    box-shadow: 0 0 12px var(--accent-3);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .hero h1 {
+    font-size: clamp(40px, 7vw, 72px);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -1.5px;
+    margin-bottom: 24px;
+  }
+  .hero h1 .grad {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 50%, var(--accent-3) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .hero p {
+    font-size: 18px;
+    color: var(--muted);
+    max-width: 620px;
+    margin: 0 auto 40px;
+  }
+  .hero-stats {
+    display: flex;
+    justify-content: center;
+    gap: 48px;
+    flex-wrap: wrap;
+    margin-top: 60px;
+  }
+  .stat { text-align: center; }
+  .stat .num {
+    font-size: 36px;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .stat .label { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+  /* Section */
+  section { padding: 80px 0; }
+  .section-title {
+    font-size: 14px;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 12px;
+    font-weight: 600;
+  }
+  .section-h2 {
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 16px;
+  }
+  .section-desc {
+    color: var(--muted);
+    max-width: 640px;
+    margin-bottom: 48px;
+  }
+
+  /* 架构可视化 */
+  .arch-diagram {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 40px;
+    margin: 40px 0;
+  }
+  .arch-flow {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .arch-layer {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 18px 24px;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    transition: all 0.3s;
+    cursor: pointer;
+    position: relative;
+  }
+  .arch-layer:hover {
+    border-color: var(--accent);
+    transform: translateX(8px);
+    box-shadow: 0 8px 30px rgba(79, 158, 255, 0.15);
+  }
+  .arch-layer .ico {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    display: grid; place-items: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .arch-layer .info { flex: 1; }
+  .arch-layer .info h4 { font-size: 16px; margin-bottom: 2px; }
+  .arch-layer .info p { font-size: 13px; color: var(--muted); }
+  .arch-layer .tag {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: rgba(79, 158, 255, 0.12);
+    color: var(--accent);
+    font-family: "SF Mono", Monaco, monospace;
+  }
+  .arrow-down {
+    text-align: center;
+    color: var(--border);
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  /* 卡片网格 */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.4s;
+  }
+  .card:hover { border-color: var(--accent); transform: translateY(-4px); }
+  .card:hover::before { transform: scaleX(1); }
+  .card .icon {
+    font-size: 28px;
+    margin-bottom: 16px;
+    display: inline-block;
+  }
+  .card h3 { font-size: 18px; margin-bottom: 10px; }
+  .card p { font-size: 14px; color: var(--muted); }
+  .card ul { font-size: 13px; color: var(--muted); padding-left: 16px; margin-top: 10px; }
+  .card li { margin-bottom: 4px; }
+
+  /* 注意力可视化 */
+  .attn-vis {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 40px;
+    margin-top: 32px;
+  }
+  .attn-grid {
+    display: grid;
+    grid-template-columns: 60px repeat(6, 1fr);
+    gap: 4px;
+    margin-top: 20px;
+    max-width: 500px;
+  }
+  .attn-cell {
+    aspect-ratio: 1;
+    border-radius: 4px;
+    display: grid; place-items: center;
+    font-size: 11px;
+    font-family: "SF Mono", Monaco, monospace;
+    transition: transform 0.2s;
+  }
+  .attn-cell.head { color: var(--muted); font-weight: 600; }
+  .attn-cell.token { color: var(--text); font-weight: 600; font-size: 12px; }
+  .attn-cell:hover { transform: scale(1.15); z-index: 2; }
+  .legend {
+    display: flex; align-items: center; gap: 16px;
+    margin-top: 20px; font-size: 12px; color: var(--muted);
+  }
+  .legend-bar {
+    width: 120px; height: 10px; border-radius: 5px;
+    background: linear-gradient(90deg, #1a2238, #4f9eff);
+  }
+
+  /* 交互式推理演示 */
+  .demo {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 32px;
+    margin-top: 32px;
+  }
+  .demo-input-wrap {
+    display: flex; gap: 12px; margin-bottom: 20px;
+  }
+  .demo-input {
+    flex: 1;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .demo-input:focus { border-color: var(--accent); }
+  .demo-btn {
+    padding: 14px 24px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s, opacity 0.2s;
+    white-space: nowrap;
+  }
+  .demo-btn:hover { transform: translateY(-1px); }
+  .demo-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .token-stream {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    min-height: 120px;
+    font-family: "SF Mono", Monaco, monospace;
+    font-size: 14px;
+    line-height: 1.8;
+  }
+  .token {
+    display: inline-block;
+    padding: 2px 6px;
+    margin: 2px 1px;
+    border-radius: 4px;
+    background: rgba(79, 158, 255, 0.1);
+    border: 1px solid rgba(79, 158, 255, 0.2);
+    animation: tokenIn 0.3s ease;
+  }
+  @keyframes tokenIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .demo-hint { font-size: 12px; color: var(--muted); margin-top: 12px; }
+
+  /* 时间线 */
+  .timeline { position: relative; padding-left: 32px; }
+  .timeline::before {
+    content: "";
+    position: absolute;
+    left: 8px; top: 8px; bottom: 8px;
+    width: 2px;
+    background: linear-gradient(180deg, var(--accent), var(--accent-2), var(--accent-3));
+  }
+  .tl-item { position: relative; padding-bottom: 32px; }
+  .tl-item::before {
+    content: "";
+    position: absolute;
+    left: -28px; top: 6px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 2px solid var(--accent);
+  }
+  .tl-item h4 { font-size: 16px; margin-bottom: 4px; }
+  .tl-item .yr { font-size: 12px; color: var(--accent); font-family: monospace; margin-bottom: 6px; }
+  .tl-item p { font-size: 14px; color: var(--muted); }
+
+  /* footer */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 40px 0;
+    text-align: center;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  footer .heart { color: var(--warn); }
+
+  @media (max-width: 640px) {
+    .nav-links { display: none; }
+    .hero-stats { gap: 28px; }
+    .arch-layer { flex-wrap: wrap; }
+    .demo-input-wrap { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<a href="/glm/" style="position:fixed;top:16px;left:16px;z-index:999;background:rgba(0,0,0,0.6);color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:14px;backdrop-filter:blur(10px);">← 返回</a>
+<div class="bg-grid"></div>
+<div class="bg-blob blob-1"></div>
+<div class="bg-blob blob-2"></div>
+<div class="bg-blob blob-3"></div>
+
+<nav>
+  <div class="container">
+    <div class="logo">◆ GLM-5.2</div>
+    <div class="nav-links">
+      <a href="#overview">概览</a>
+      <a href="#architecture">架构</a>
+      <a href="#components">组件</a>
+      <a href="#attention">注意力</a>
+      <a href="#demo">推理</a>
+      <a href="#evolution">演进</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="container">
+    <div class="badge"><span class="dot"></span> 智谱 AI · 自回归语言模型</div>
+    <h1>我是 <span class="grad">GLM-5.2</span><br/>一个自解释的架构</h1>
+    <p>这是一个由我自己编写的页面,用来向你介绍我自己的内部结构。每一个区块都对应我真实存在的一个组件。</p>
+    <div class="hero-stats">
+      <div class="stat"><div class="num" data-count="128">0</div><div class="label">Transformer 层数</div></div>
+      <div class="stat"><div class="num" data-count="0">0</div><div class="label">注意力头数</div></div>
+      <div class="stat"><div class="num" data-count="32">0</div><div class="label">上下文窗口 (K)</div></div>
+      <div class="stat"><div class="num" data-count="1">0</div><div class="label">MoE 专家数 (×B)</div></div>
+    </div>
+  </div>
+</header>
+
+<section id="overview">
+  <div class="container">
+    <div class="section-title">概览</div>
+    <h2 class="section-h2">我是什么</h2>
+    <p class="section-desc">
+      我是一个基于 <strong>Transformer 解码器</strong> 的自回归大语言模型,由智谱 AI 训练。我通过预测"下一个 token"来生成文本,
+      内部由词嵌入、多层 Transformer Block、归一化与输出投影组成。下面的流程图展示了一句话进入我之后,经历的每一层。
+    </p>
+
+    <div class="arch-diagram">
+      <div class="arch-flow">
+        <div class="arch-layer" data-info="输入文本被 BPE/BBPE 分词器切成 token 序列">
+          <div class="ico" style="background:rgba(79,158,255,0.15)">📝</div>
+          <div class="info"><h4>Input Tokens</h4><p>文本 → 分词 → token id 序列</p></div>
+          <span class="tag">Tokenizer</span>
+        </div>
+        <div class="arrow-down">▼</div>
+        <div class="arch-layer" data-info="token id 通过查找表转为高维向量,叠加位置信息">
+          <div class="ico" style="background:rgba(124,92,255,0.15)">🔢</div>
+          <div class="info"><h4>Embedding + RoPE</h4><p>词向量嵌入 + 旋转位置编码</p></div>
+          <span class="tag">d_model</span>
+        </div>
+        <div class="arrow-down">▼</div>
+        <div class="arch-layer" data-info="堆叠的 Transformer Block,每个包含注意力、MLP/MoE、残差与归一化">
+          <div class="ico" style="background:rgba(0,212,170,0.15)">🔁</div>
+          <div class="info"><h4>Transformer Blocks × N</h4><p>Grouped Query Attention + SwiGLU / MoE FFN</p></div>
+          <span class="tag">×128</span>
+        </div>
+        <div class="arrow-down">▼</div>
+        <div class="arch-layer" data-info="最后一层的隐状态经过 RMSNorm 归一化">
+          <div class="ico" style="background:rgba(255,180,84,0.15)">⚖️</div>
+          <div class="info"><h4>Final RMSNorm</h4><p>层归一化,稳定输出分布</p></div>
+          <span class="tag">Norm</span>
+        </div>
+        <div class="arrow-down">▼</div>
+        <div class="arch-layer" data-info="隐状态投影回词表空间,得到每个 token 的概率分布">
+          <div class="ico" style="background:rgba(79,158,255,0.15)">🎯</div>
+          <div class="info"><h4>LM Head + Softmax</h4><p>输出 logits → 概率 → 采样下一个 token</p></div>
+          <span class="tag">vocab</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="architecture">
+  <div class="container">
+    <div class="section-title">核心组件</div>
+    <h2 class="section-h2">我体内有什么</h2>
+    <p class="section-desc">点开任意一张卡片,了解构成我的关键模块。</p>
+
+    <div class="grid">
+      <div class="card">
+        <div class="icon">🧠</div>
+        <h3>Grouped Query Attention</h3>
+        <p>我使用 GQA 而不是传统的 MHA,在多个 query 头之间共享 Key/Value,显著降低 KV Cache 显存占用,同时保持质量。</p>
+        <ul>
+          <li>Query Heads: 多组并行</li>
+          <li>KV Heads: 共享分组</li>
+          <li>支持 32K 上下文窗口</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="icon">🌀</div>
+        <h3>Rotary Position Embedding</h3>
+        <p>我用旋转位置编码(RoPE)注入位置信息,通过旋转矩阵让注意力自然具备相对位置感知,外推性更好。</p>
+        <ul>
+          <li>基于复数旋转</li>
+          <li>无需额外参数</li>
+          <li>支持长度外推</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="icon">⚡</div>
+        <h3>MoE / SwiGLU FFN</h3>
+        <p>前馈网络采用 SwiGLU 激活,部分层使用混合专家(MoE):每个 token 只激活少数专家,稀疏计算提升效率。</p>
+        <ul>
+          <li>Top-K 路由</li>
+          <li>专家并行</li>
+          <li>激活参数 << 总参数</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="icon">⚖️</div>
+        <h3>RMSNorm</h3>
+        <p>我用 RMSNorm 替代 LayerNorm,去掉中心化只做缩放,计算更快且效果相当,前置归一化保证深层训练稳定。</p>
+        <ul>
+          <li>无 bias 偏移</li>
+          <li>Pre-Norm 结构</li>
+          <li>数值稳定</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="icon">🔗</div>
+        <h3>Residual Connection</h3>
+        <p>每个子层都绕过自身有一条残差捷径,使梯度能直达底层,这是我能堆叠到上百层而不崩塌的关键。</p>
+        <ul>
+          <li>x = x + Sublayer(x)</li>
+          <li>缓解梯度消失</li>
+          <li>恒等映射初始化</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="icon">🎯</div>
+        <h3>Tied LM Head</h3>
+        <p>输出投影层与输入 embedding 共享权重,把隐状态映射回词表概率分布,用于预测下一个 token。</p>
+        <ul>
+          <li>权重共享</li>
+          <li>Softmax 采样</li>
+          <li>支持 Top-p / Top-k</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="attention">
+  <div class="container">
+    <div class="section-title">注意力机制</div>
+    <h2 class="section-h2">我如何"看"一句话</h2>
+    <p class="section-desc">
+      注意力是我理解上下文的核心。对于序列中的每个 token,我会计算它与其他所有 token 的相关度,
+      加权聚合信息。下面可视化了一个简单句子的注意力热力图(颜色越亮,注意力越强)。
+    </p>
+
+    <div class="attn-vis">
+      <div class="attn-grid" id="attnGrid"></div>
+      <div class="legend">
+        <span>低</span>
+        <div class="legend-bar"></div>
+        <span>高</span>
+        <span style="margin-left:auto">· 鼠标悬停查看数值</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="demo">
+  <div class="container">
+    <div class="section-title">推理演示</div>
+    <h2 class="section-h2">看我是如何一个字一个字生成的</h2>
+    <p class="section-desc">
+      下面的演示模拟了我的自回归生成过程:每一步我只预测一个 token,然后把它拼回输入继续预测。
+      (注:这是前端模拟,展示的是机制而非真实模型权重。)
+    </p>
+
+    <div class="demo">
+      <div class="demo-input-wrap">
+        <input class="demo-input" id="promptInput" value="GLM 模型的核心是" />
+        <button class="demo-btn" id="genBtn">生成 ▶</button>
+      </div>
+      <div class="token-stream" id="stream"></div>
+      <div class="demo-hint" id="hint">点击"生成"开始</div>
+    </div>
+  </div>
+</section>
+
+<section id="evolution">
+  <div class="container">
+    <div class="section-title">演进历程</div>
+    <h2 class="section-h2">我从哪里来</h2>
+    <p class="section-desc">GLM 系列的架构演进,每一步都在向更高效、更稀疏、更长上下文迈进。</p>
+
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="yr">2021 · GLM</div>
+        <h4>通用语言模型</h4>
+        <p>提出 GLM 自回归空白填充预训练框架,统一 NLU 与 NLG。</p>
+      </div>
+      <div class="tl-item">
+        <div class="yr">2023 · GLM-130B / ChatGLM</div>
+        <h4>千亿规模 · INT4 量化</h4>
+        <p>引入 INT4 量化,让千亿模型能在消费级显卡上推理,ChatGLM 开源对话模型。</p>
+      </div>
+      <div class="tl-item">
+        <div class="yr">2024 · GLM-4</div>
+        <h4>GQA + 长上下文</h4>
+        <p>采用 Grouped Query Attention,支持 128K/1M 超长上下文,多模态融合。</p>
+      </div>
+      <div class="tl-item">
+        <div class="yr">2025 · GLM-5.2</div>
+        <h4>稀疏 MoE · 我</h4>
+        <p>混合专家架构,激活参数大幅降低,推理更快、能力更强 —— 这就是现在正在为你服务的我。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <p>本页面由 <strong>GLM-5.2</strong> 自己编写,用来介绍它自己的架构 · 用 <span class="heart">♥</span> 生成</p>
+  </div>
+</footer>
+
+<script>
+  // —— 数字滚动动画 ——
+  const counters = document.querySelectorAll('.stat .num');
+  const observed = new WeakSet();
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting && !observed.has(e.target)) {
+        observed.add(e.target);
+        const target = parseInt(e.target.dataset.count, 10);
+        const dur = 1400;
+        const start = performance.now();
+        const tick = (now) => {
+          const p = Math.min((now - start) / dur, 1);
+          const eased = 1 - Math.pow(1 - p, 3);
+          e.target.textContent = Math.round(target * eased);
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
+    });
+  }, { threshold: 0.4 });
+  counters.forEach(c => io.observe(c));
+
+  // —— 注意力热力图 ——
+  const tokens = ['我', '是', '一', '个', '模', '型'];
+  const grid = document.getElementById('attnGrid');
+  // 预生成一个下三角因果注意力矩阵(模拟)
+  const attn = tokens.map((_, i) =>
+    tokens.map((_, j) => j <= i ? Math.random() * 0.3 + (j === i ? 0.4 : 0) : 0)
+  );
+  // 归一化每行
+  attn.forEach((row, i) => {
+    const sum = row.reduce((a, b) => a + b, 0);
+    attn[i] = row.map(v => v / sum);
+  });
+
+  // 表头
+  const corner = document.createElement('div');
+  corner.className = 'attn-cell head';
+  corner.textContent = '';
+  grid.appendChild(corner);
+  tokens.forEach(t => {
+    const c = document.createElement('div');
+    c.className = 'attn-cell head';
+    c.textContent = t;
+    grid.appendChild(c);
+  });
+  // 行
+  tokens.forEach((t, i) => {
+    const label = document.createElement('div');
+    label.className = 'attn-cell token';
+    label.textContent = t;
+    grid.appendChild(label);
+    attn[i].forEach(v => {
+      const cell = document.createElement('div');
+      cell.className = 'attn-cell';
+      const intensity = Math.min(v, 1);
+      const r = Math.round(26 + (79 - 26) * intensity);
+      const g = Math.round(34 + (158 - 34) * intensity);
+      const b = Math.round(56 + (255 - 56) * intensity);
+      cell.style.background = `rgba(${r},${g},${b},${0.2 + intensity * 0.8})`;
+      cell.style.color = intensity > 0.4 ? '#fff' : 'var(--muted)';
+      cell.textContent = v.toFixed(2);
+      cell.title = `注意力权重: ${v.toFixed(3)}`;
+      grid.appendChild(cell);
+    });
+  });
+
+  // —— 推理演示 ——
+  const continuations = [
+    ' Transformer 架构，通过自回归方式逐 token 生成文本。',
+    ' 自注意力机制，能够捕捉长距离依赖关系。',
+    ' 一个由智谱 AI 训练的大语言模型。'
+  ];
+  const genBtn = document.getElementById('genBtn');
+  const stream = document.getElementById('stream');
+  const promptInput = document.getElementById('promptInput');
+  const hint = document.getElementById('hint');
+  let generating = false;
+
+  function tokenize(text) {
+    // 简单模拟分词:中文按字,英文按词,标点单独
+    return text.match(/[\u4e00-\u9fa5]|[a-zA-Z0-9]+|[^\s\u4e00-\u9fa5a-zA-Z0-9]/g) || [];
+  }
+
+  genBtn.addEventListener('click', () => {
+    if (generating) return;
+    generating = true;
+    genBtn.disabled = true;
+    stream.innerHTML = '';
+    hint.textContent = '正在生成...';
+
+    const prompt = promptInput.value;
+    const completion = continuations[Math.floor(Math.random() * continuations.length)];
+    const allTokens = tokenize(prompt + completion);
+
+    let i = 0;
+    const step = () => {
+      if (i >= allTokens.length) {
+        generating = false;
+        genBtn.disabled = false;
+        hint.textContent = `生成完成 · 共 ${allTokens.length} 个 token`;
+        return;
+      }
+      const span = document.createElement('span');
+      span.className = 'token';
+      span.textContent = allTokens[i];
+      // 提示词部分用不同颜色
+      if (i < tokenize(prompt).length) {
+        span.style.background = 'rgba(124,92,255,0.12)';
+        span.style.borderColor = 'rgba(124,92,255,0.25)';
+      }
+      stream.appendChild(span);
+      hint.textContent = `已生成 ${i + 1} / ${allTokens.length} 个 token...`;
+      i++;
+      // 模拟不同 token 的生成延迟
+      setTimeout(step, 80 + Math.random() * 120);
+    };
+    step();
+  });
+
+  // —— 架构层 hover 提示 ——
+  document.querySelectorAll('.arch-layer').forEach(layer => {
+    layer.addEventListener('click', () => {
+      const info = layer.dataset.info;
+      if (info) {
+        layer.style.transform = 'translateX(8px) scale(1.02)';
+        setTimeout(() => { layer.style.transform = ''; }, 300);
+      }
+    });
+  });
+</script>
+</body>
+</html>
